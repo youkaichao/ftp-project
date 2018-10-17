@@ -25,6 +25,14 @@ class User(object):
         self.control_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+    def close_control_socket(self):
+        self.control_socket.close()
+        self.control_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    def close_data_socket(self):
+        self.data_socket.close()
+        self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
     def read_all_control(self):
         # control connection read, the reply from the server should always be printed out to the user
         data = rec_all(self.control_socket)
@@ -33,9 +41,12 @@ class User(object):
 
     def read_all_data(self):
         data = rec_all(self.data_socket)
-        self.data_socket.close()
-        self.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.close_data_socket()
         return data
+
+    def send_all_data(self, data):
+        self.data_socket.sendall(data)
+        self.close_data_socket()
 
     def connect_data_socket(self):
         if user.mode == User.PASSIVE:
@@ -59,10 +70,6 @@ class User(object):
 
             user.control_socket.sendall("PORT" + '\r\n')
             data = user.read_all_control()
-
-    def close(self):
-        self.control_socket.close()
-        self.control_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
 
 user = User() # single instance
@@ -127,8 +134,7 @@ def retr_handler(command):
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
     if not data.startswith('150'):
-        user.data_socket.close()
-        user.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        user.close_data_socket()
         return
     data = user.read_all_data()
     filename = command[command.index(' ') + 1:].strip()
@@ -142,8 +148,7 @@ def list_handler(command):
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
     if not data.startswith('150'):
-        user.data_socket.close()
-        user.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        user.close_data_socket()
         return
     data = user.read_all_data()
     user.read_all_control()
@@ -155,15 +160,12 @@ def stor_handler(command):
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
     if not data.startswith('150'):
-        user.data_socket.close()
-        user.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        user.close_data_socket()
         return
     filename = command[command.index(' ') + 1:].strip()
     with open(filename, 'rb') as f:
         data = f.read()
-    user.data_socket.sendall(data)
-    user.data_socket.close()
-    user.data_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    user.send_all_data(data)
     user.read_all_control()
 
 
@@ -194,7 +196,7 @@ def quit_handler(command):
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
     user.is_logged_in = False
-    user.close()
+    user.close_control_socket()
     return
 
 
