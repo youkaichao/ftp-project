@@ -4,6 +4,24 @@ import traceback
 BUFFER_SIZE = 1024
 import time
 
+HOST_IP = None
+
+
+def get_host_ip():
+    global HOST_IP
+    if not HOST_IP:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s.connect(('8.8.8.8', 80))
+            ip = s.getsockname()[0]
+            HOST_IP = ip
+            return HOST_IP
+        finally:
+            s.close()
+    else:
+        return HOST_IP
+
+
 def rec_all(sock):
     allData = ''
     while True:
@@ -64,11 +82,14 @@ class User(object):
             for port in range(20000, 65536):
                 try:
                     self.data_socket.bind(('', port))
+                    binded = True
+                    break
                 except Exception as e:
                     continue
-                break
-
-            user.control_socket.sendall("PORT" + '\r\n')
+            p1 = port // 256
+            p2 = port % 256
+            params = get_host_ip().replace('.', ',') + ',%s,%s '%(p1, p2)
+            user.control_socket.sendall("PORT " + params + '\r\n')
             data = user.read_all_control()
 
 
