@@ -55,3 +55,4 @@ while True:
     except Exception as e:
         user.is_logged_in = False
         traceback.print_exc()
+        user.close_control_socket()

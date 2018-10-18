@@ -58,6 +58,9 @@ class User(object):
         return data
 
     def read_all_data(self):
+        if self.mode == User.PORT_MODE:
+            conn, addres = self.data_socket.accept()
+            self.data_socket = conn
         data = rec_all(self.data_socket)
         self.close_data_socket()
         return data
@@ -78,17 +81,12 @@ class User(object):
             user.data_socket.connect((ip, port))
         elif user.mode == User.PORT_MODE:
             # find a port and then listen
-            binded = False
-            for port in range(20000, 65536):
-                try:
-                    self.data_socket.bind(('', port))
-                    binded = True
-                    break
-                except Exception as e:
-                    continue
+            self.data_socket.bind(('', 0))
+            ip, port = self.data_socket.getsockname()
+            self.data_socket.listen(1)
             p1 = port // 256
             p2 = port % 256
-            params = get_host_ip().replace('.', ',') + ',%s,%s '%(p1, p2)
+            params = get_host_ip().replace('.', ',') + ',%s,%s'%(p1, p2)
             user.control_socket.sendall("PORT " + params + '\r\n')
             data = user.read_all_control()
 
@@ -110,6 +108,7 @@ class Command(object):
         except Exception as e:
             traceback.print_exc()
             print(e.message)
+            user.close_data_socket()
             return e
 
 
@@ -155,8 +154,7 @@ def retr_handler(command):
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
     if not data.startswith('150'):
-        user.close_data_socket()
-        return
+        raise Exception('wrong return code!')
     data = user.read_all_data()
     filename = command[command.index(' ') + 1:].strip()
     with open(filename, 'wb') as f:
@@ -169,21 +167,23 @@ def list_handler(command):
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
     if not data.startswith('150'):
-        user.close_data_socket()
-        return
+        raise Exception('wrong return code!')
     data = user.read_all_data()
     user.read_all_control()
     print(data)
 
 
 def stor_handler(command):
+    filename = command[command.index(' ') + 1:].strip()
+    import os
+    if not (os.path.exists(filename) and os.path.isfile(filename)):
+        print("'%s' not exists!" % (filename))
+        return
     user.connect_data_socket()
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
     if not data.startswith('150'):
-        user.close_data_socket()
-        return
-    filename = command[command.index(' ') + 1:].strip()
+        raise Exception('wrong return code!')
     with open(filename, 'rb') as f:
         data = f.read()
     user.send_all_data(data)
