@@ -5,21 +5,21 @@ import traceback
 def execute_one_session():
     socket_connected = False
     while not socket_connected:
-        ip = raw_input('please input server ip:').strip() or '144.208.69.31'
-        port = raw_input('please input server port:').strip() or '21'
+        ip = raw_input('please input server ip:').strip()
+        port = raw_input('please input server port:').strip()
         port = int(port)
         error = connect_command.invoke(ip, port)
         socket_connected = not error
 
     username_accepted = False
     while not username_accepted:
-        username = raw_input('please input username:').strip() or 'dlpuser@dlptest.com'
+        username = raw_input('please input username:').strip()
         error = user_command.invoke(username)
         username_accepted = not error
 
     password_accepted = False
     while not password_accepted:
-        password = raw_input('please input password:').strip() or 'e73jzTRTNqCN9PYAAjjn'
+        password = raw_input('please input password:').strip()
         error = pass_command.invoke(password)
         password_accepted = not error
 

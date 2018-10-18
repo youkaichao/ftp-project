@@ -221,6 +221,9 @@ def quit_handler(command):
     return
 
 
+def exit_handler(command):
+    exit(0)
+
 commands = [
     Command('QUIT', 'quit the current session. \r\n usage: QUIT ', quit_handler),
     Command('SYST', 'get the system information about the server \r\n usage: SYST ', default_handler),
@@ -236,6 +239,7 @@ commands = [
     Command('SHOWMODE', 'show the current mode \r\n  usage: SHOWMODE', showMode),
     Command('RETR', 'retrieve file from remote server \r\n  usage: RETR <SP> <pathname>', retr_handler),
     Command('STOR', 'store file to remote server \r\n  usage: STOR <SP> <pathname>', stor_handler),
+    Command('EXIT', 'exit the client program \r\n  usage: EXIT', exit_handler),
 ]
 
 name_to_command = {

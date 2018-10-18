@@ -1,0 +1,54 @@
+144.208.69.31
+21
+dlpuser@dlptest.com
+e73jzTRTNqCN9PYAAjjn
+
+# data relevant
+syst
+mkd aaa
+cwd aaa
+pwd
+cwd ../
+rnfr aaa
+rnto bbb
+rmd bbb
+
+# data relevant
+setport
+retr FTP.txt
+stor what.txt
+list
+setpasv
+
+retr FTP.txt
+stor what.txt
+list
+
+quit
+144.208.69.31
+21
+dlpuser@dlptest.com
+e73jzTRTNqCN9PYAAjjn
+
+# data relevant
+syst
+mkd aaa
+cwd aaa
+pwd
+cwd ../
+rnfr aaa
+rnto bbb
+rmd bbb
+
+# data relevant
+setport
+retr FTP.txt
+stor what.txt
+list
+setpasv
+
+retr FTP.txt
+stor what.txt
+list
+exit
+quit
