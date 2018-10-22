@@ -99,7 +99,7 @@ def test(port=21, directory='/tmp'):
 
 build()
 # Test 1
-test()
+# test()
 # Test 2
 port = random.randint(2000, 3000)
 directory = ''.join(random.choice(string.ascii_letters) for x in xrange(10))

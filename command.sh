@@ -1,3 +1,3 @@
-cd /home/youkaichao/code/ftpserver/src;
+cd /home/youkaichao/code/server/;
 ./autograde.py;
 make
