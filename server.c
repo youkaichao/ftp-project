@@ -1,37 +1,5 @@
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
-#include <errno.h>
-#include <ctype.h>
-#include <string.h>
-#include <memory.h>
-#include <stdio.h>
-#include <string.h>
-#include <assert.h>
-#include <stdlib.h>
-#include <pthread.h>
 
-#define clean_errno() (errno == 0 ? "None" : strerror(errno))
-#define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
-#define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); }
-
-struct ThreadData{
-	pthread_t* pthread_id;//pointer to thread id
-	int* pconnfd;// pointer to connection file descriptor
-};
-
-void *connection_thread(void *vargp);
-int writeNullTerminatedString(int fd, const char* str);
-//void *connection_data(void *vargp);
-
-#define CONNECT_OK 	     220
-
-char* const_msg[] = {
-	[CONNECT_OK] = "220 Anonymous FTP server ready.\r\n",
-};
-
-char root_dir[2000] = "/tmp";
-int host_port = 21;
+#include "common.h"
 
 int main(int argc, char **argv) {
 	// check arguments and set port and root_dir
@@ -80,57 +48,78 @@ int main(int argc, char **argv) {
 			continue;
 		}
 		pthread_t thread_id;
-		struct ThreadData threadData;
-		threadData.pthread_id = &thread_id;
-		threadData.pconnfd = &connfd;
-		pthread_create(&thread_id, NULL, connection_thread, (void *)&threadData);
+		struct ThreadData * pthreadData = (struct ThreadData *) malloc(sizeof (struct ThreadData));
+		pthreadData->pthread_id = &thread_id;
+		pthreadData->pconnfd = &connfd;
+		pthreadData->userState = JUST_CONNECTED;
+		pthread_create(&thread_id, NULL, connection_thread, (void *)pthreadData);
 	}
 	close(listenfd);
 }
 
 void *connection_thread(void *vargp)
 {
-	struct ThreadData* p = (struct ThreadData*)vargp;
-	int thread_id = *(p->pthread_id);
-	int connfd = *(p->pconnfd);
-	if(!writeNullTerminatedString(connfd, const_msg[CONNECT_OK]))
+	struct ThreadData* pThreadData = (struct ThreadData*)vargp;
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(!writeNullTerminatedString(connfd, CONNECT_OK_MSG))
 	{
-		printf("thread id is %d", thread_id);
-		close(connfd);
-		return 0;
+		goto endConnection;
 	}
-	printf("thread id is %d", thread_id);
 
-	// p = 0;
-	// while (1) {
-	// 	int n = read(connfd, sentence + p, 8191 - p);
-	// 	if (n < 0) {
-	// 		printf("Error read(): %s(%d)\n", strerror(errno), errno);
-	// 		close(connfd);
-	// 		continue;
-	// 	} else if (n == 0) {
-	// 		break;
-	// 	} else {
-	// 		p += n;
-	// 		if (sentence[p - 1] == '\n') {
-	// 			break;
-	// 		}
-	// 	}
-	// }
-	// sentence[p - 1] = '\0';
-	// len = p - 1;
-	
-	// for (p = 0; p < len; p++) {
-	// 	sentence[p] = toupper(sentence[p]);
-	// }
+	while(1)
+	{
+		// read one command that ends with <CRLF> and dispath it
+		int p = 0;
+		int n;
+		while(1)
+		{
+			n = read(connfd, buffer + p, BUFFER_SIZE - 1 - p);
+			if (n < 0) {
+				printf("Error read(): %s(%d)\n", strerror(errno), errno);
+				goto endConnection;
+			}
+			if(n == 0)
+			{// the client closed the connection
+				goto endConnection;
+			}
+			p += n;
+			if(p < 2)
+			{// each command has CRLF and is at lest 2 characters long
+				continue;
+			}
+			if(!strcmp(buffer + p - 2, "\r\n"))
+			{// command end with CRLF
+				buffer[p] = '\0';
+				if(!dispatchCommand(pThreadData))
+				{
+					goto endConnection;
+				}
+				break;
+			}else{
+				if(p == BUFFER_SIZE - 1)
+				{// buffer is full
+					if(!writeNullTerminatedString(connfd, UNKNOWN_COMMAND_MSG))
+					{
+						goto endConnection;
+					}
+					break;
+				}
+				else{
+					continue;
+				}
+			}
+		}
+	}
 
+endConnection:
+	free(vargp);
 	close(connfd);
 	return 0;
 }
 
-/*
-return 1 if it writes successfully, 0 otherwise 
-*/
 int writeNullTerminatedString(int fd, const char* str)
 {
 	int n = write(fd, str, strlen(str));
@@ -139,4 +128,279 @@ int writeNullTerminatedString(int fd, const char* str)
 		return 0;
 	}
 	return 1;
+}
+
+int dispatchCommand(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+
+	/* parse the command*/
+	char command[5];
+	int len = strlen(buffer) - 2;// len of command, \r\n not included
+	char* space_pos = strchr(buffer, (int)' ');
+	if(space_pos)
+	{// space found
+		len = space_pos - buffer;
+	}
+	if(len >= 5)
+	{// len >= 5, wrong command
+		return writeNullTerminatedString(connfd, UNKNOWN_COMMAND_MSG);
+	}
+	int i = 0;
+	for (; i < len; ++i)
+	{
+		command[i] = toupper(buffer[i]);
+	}
+	command[i] = '\0';
+
+	// find the command id
+	i = 0;
+	for(; i < NUM_OF_COMMANDS; ++i)
+	{
+		if(!strcmp(command, command_to_string[i]))
+		{
+			break;
+		}
+	}
+	return handlers[i](pThreadData);
+}
+
+/*
+====================== miscellaneous commands ====================================
+*/
+int WRONG_COMMAND_handler(struct ThreadData* pThreadData)
+{
+	int connfd = *(pThreadData->pconnfd);
+	return writeNullTerminatedString(connfd, UNKNOWN_COMMAND_MSG);
+}
+
+
+int QUIT_handler(struct ThreadData* pThreadData)
+{
+	int connfd = *(pThreadData->pconnfd);
+	writeNullTerminatedString(connfd, QUIT_MSG);
+	return 0;
+}
+
+
+int SYST_handler(struct ThreadData* pThreadData)
+{
+	int connfd = *(pThreadData->pconnfd);
+	return writeNullTerminatedString(connfd, SYST_MSG);
+}
+
+// TODO:
+int TYPE_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+/*
+====================== login commands ====================================
+*/
+int USER_handler(struct ThreadData* pThreadData)
+{
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState > AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, ALREADY_LOGGED_IN_MSG);
+	}
+	if(strcmp(buffer + 4, " anonymous"))
+	{// user name not anonymous, unknwon command
+		pThreadData->userState = JUST_CONNECTED;
+		return WRONG_COMMAND_handler(pThreadData);
+	}
+	// user name OK
+	pThreadData->userState = HAS_USER_NAME;
+	return writeNullTerminatedString(connfd, USERNAMR_OK_MSG);
+}
+
+
+int PASS_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	
+	switch (userState)
+	{
+		case JUST_CONNECTED:
+			return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+			break;
+		case HAS_USER_NAME:
+			pThreadData->userState = LOGGED_IN;
+			return writeNullTerminatedString(connfd, PASSWORD_OK_MSG);
+			break;
+		case LOGGED_IN:
+		case RNFR_STATE:
+		case AUTHORIZATION_LINE:
+		default:
+			return writeNullTerminatedString(connfd, ALREADY_LOGGED_IN_MSG);
+			break;
+	}
+}
+
+/*
+====================== commands with data connection====================================
+*/
+
+// TODO:
+int PORT_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+// TODO:
+int PASV_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+// TODO:
+int RETR_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+// TODO:
+int STOR_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+// TODO:
+int LIST_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState  < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+
+/*
+====================== directory related commands ====================================
+*/
+// TODO:
+int MKD_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+// TODO:
+int CWD_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState  < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+// TODO:
+int PWD_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState  < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+
+// TODO:
+int RMD_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState  < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+// TODO:
+int RNFR_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState  < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+}
+
+// TODO:
+int RNTO_handler(struct ThreadData* pThreadData)
+{
+	int thread_id = *(pThreadData->pthread_id);
+	int connfd = *(pThreadData->pconnfd);
+	char* buffer = pThreadData->buffer;
+	enum UserState userState = pThreadData->userState;
+	if(userState < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
 }
