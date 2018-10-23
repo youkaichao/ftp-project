@@ -13,22 +13,26 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <sys/stat.h>
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
 #define assertf(A, M, ...) if(!(A)) {log_error(M, ##__VA_ARGS__); assert(A); }
 
 #define BUFFER_SIZE 2048
+#define MAX_DIRECTORY_SIZE 200
 
-char CONNECT_OK_MSG[] = "220 Anonymous FTP server ready.\r\n";
-char UNKNOWN_COMMAND_MSG[] = "500 Syntax error, command unrecognized.\r\n";
-char NOT_LOGGED_IN_MSG[] = "530 Not logged in.\r\n";
-char ALREADY_LOGGED_IN_MSG[] = "530 Already Logged In.\r\n";
-char USERNAMR_OK_MSG[] = "331 User name okay, need email as password.\r\n";
-char PASSWORD_OK_MSG[] = "230 User logged in, proceed.\r\n";
-char QUIT_MSG[] = "221 Bye bye.\r\n";
-char SYST_MSG[] = "215 UNIX Type: L8\r\n";
-
+extern char CONNECT_OK_MSG[];
+extern char UNKNOWN_COMMAND_MSG[];
+extern char NOT_LOGGED_IN_MSG[];
+extern char ALREADY_LOGGED_IN_MSG[];
+extern char USERNAMR_OK_MSG[];
+extern char PASSWORD_OK_MSG[];
+extern char TYPE_SET_MSG[];
+extern char QUIT_MSG[];
+extern char SYST_MSG[];
+extern char WRONG_PATH_MSG[];
+extern char CREATED_PATH_MSG[];
 
 enum UserState {
     JUST_CONNECTED, HAS_USER_NAME,
@@ -39,6 +43,7 @@ struct ThreadData{
 	pthread_t* pthread_id;//pointer to thread id
 	int* pconnfd;// pointer to connection file descriptor
 	char buffer[BUFFER_SIZE]; // reading buffer
+    char cwd[MAX_DIRECTORY_SIZE]; // current working directory
 	enum UserState userState;
 };
 
@@ -67,47 +72,12 @@ enum COMMANDS {
     NUM_OF_COMMANDS
 };
 
-char* command_to_string[] = {
-[USER] = "USER", 
-[PASS] = "PASS", 
-[RETR] = "RETR", 
-[STOR] = "STOR", 
-[QUIT] = "QUIT", 
-[SYST] = "SYST", 
-[TYPE] = "TYPE", 
-[PORT] = "PORT", 
-[PASV] = "PASV", 
-[MKD] = "MKD", 
-[CWD] = "CWD", 
-[PWD] = "PWD", 
-[LIST] = "LIST", 
-[RMD] = "RMD", 
-[RNFR] = "RNFR", 
-[RNTO] = "RNTO",
-};
+extern char* command_to_string[];
 
-HANDLER handlers[] = {
-[USER] = USER_handler,
-[PASS] = PASS_handler,
-[RETR] = RETR_handler,
-[STOR] = STOR_handler,
-[QUIT] = QUIT_handler,
-[SYST] = SYST_handler,
-[TYPE] = TYPE_handler,
-[PORT] = PORT_handler,
-[PASV] = PASV_handler,
-[MKD] = MKD_handler,
-[CWD] = CWD_handler,
-[PWD] = PWD_handler,
-[LIST] = LIST_handler,
-[RMD] = RMD_handler,
-[RNFR] = RNFR_handler,
-[RNTO] = RNTO_handler,
-[NUM_OF_COMMANDS] = WRONG_COMMAND_handler
-};
+extern HANDLER handlers[];
 
-char root_dir[2000] = "/tmp";
-int host_port = 21;
+extern char root_dir[MAX_DIRECTORY_SIZE];
+extern int host_port;
 
 /*
 thread to dispose one connection
@@ -127,4 +97,17 @@ that is to say, the last 3 characters are \r \n \0
 */
 int dispatchCommand(struct ThreadData* pThreadData);
 
+/*
+join two path: patha + pathb. the result is stored in patha.
+return 1 in succeeding.
+**warning : it assumes that patha points to a long enough buffer!**
+*/
+int join_path(char* patha, char* pathb);
+
+/*
+dispose path.
+join ``cwd`` and ``command[proceding:]`` into ``buffer``,
+check if the answer exceeds ``root_dir``
+*/
+int dispose_path(char* buffer, char* command, int proceding, char* cwd, char* root_dir);
 #endif
