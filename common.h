@@ -33,6 +33,8 @@ extern char QUIT_MSG[];
 extern char SYST_MSG[];
 extern char WRONG_PATH_MSG[];
 extern char CREATED_PATH_MSG[];
+extern char CWD_OK_MSG[];
+extern char RMD_OK_MSG[];
 
 enum UserState {
     JUST_CONNECTED, HAS_USER_NAME,

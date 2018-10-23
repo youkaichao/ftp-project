@@ -11,6 +11,9 @@ char QUIT_MSG[] = "221 Bye bye.\r\n";
 char SYST_MSG[] = "215 UNIX Type: L8\r\n";
 char WRONG_PATH_MSG[] = "530 Wrong Path!\r\n";
 char CREATED_PATH_MSG[] = "257 \"%s\" created!\r\n";
+char CWD_OK_MSG[] = "250 Requested file action okay, completed.\r\n";
+char PWD_OK_MSG[] = "257 \"%s\" is your current location.\r\n";
+char RMD_OK_MSG[] = "250 Requested file action okay, completed.\r\n";
 
 char* command_to_string[] = {
 [USER] = "USER", 
@@ -429,10 +432,8 @@ int MKD_handler(struct ThreadData* pThreadData)
 	return writeNullTerminatedString(connfd, tmpMsg);
 }
 
-// TODO:
 int CWD_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
@@ -440,12 +441,23 @@ int CWD_handler(struct ThreadData* pThreadData)
 	{
 		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
 	}
+	char tmpDir[MAX_DIRECTORY_SIZE];
+	if(!dispose_path(tmpDir, buffer, 4, pThreadData->cwd, root_dir))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	struct stat s = {0};
+	stat(tmpDir, &s);
+	if(!(s.st_mode & S_IFDIR))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	strcpy(pThreadData->cwd, tmpDir);
+	return writeNullTerminatedString(connfd, CWD_OK_MSG);
 }
 
-// TODO:
 int PWD_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
@@ -453,10 +465,11 @@ int PWD_handler(struct ThreadData* pThreadData)
 	{
 		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
 	}
+	char tmpMsg[MAX_DIRECTORY_SIZE];
+	sprintf(tmpMsg, PWD_OK_MSG, pThreadData->cwd);
+	return writeNullTerminatedString(connfd, tmpMsg);
 }
 
-
-// TODO:
 int RMD_handler(struct ThreadData* pThreadData)
 {
 	int thread_id = *(pThreadData->pthread_id);
@@ -467,6 +480,29 @@ int RMD_handler(struct ThreadData* pThreadData)
 	{
 		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
 	}
+	char tmpDir[MAX_DIRECTORY_SIZE];
+	if(!dispose_path(tmpDir, buffer, 4, pThreadData->cwd, root_dir))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	struct stat s = {0};
+	stat(tmpDir, &s);
+	if(!(s.st_mode & S_IFDIR))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	// rmdir, what if it removes its cwd?
+	if(!strcmp(pThreadData->cwd, tmpDir))
+	{// it tries to remove its current working directory!
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	if(!rmdir(tmpDir))
+	{// success
+		return writeNullTerminatedString(connfd, RMD_OK_MSG);
+	}
+	else{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}	
 }
 
 // TODO:
