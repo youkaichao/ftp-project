@@ -19,4 +19,5 @@ int main()
     test_path_join("/a/a/", "b/g");
     test_path_join("/a/a", "b/g/");
     test_path_join("/a/a/", "b/g/");
+    file_ls("a.txt", ".");
 }

@@ -337,6 +337,73 @@ int PASV_handler(struct ThreadData* pThreadData)
 	}
 }
 
+int read_or_write_file(char* filename, struct ThreadData* pThreadData, int flag)
+{
+	if(!(flag == O_RDONLY || flag == O_WRONLY))
+	{
+		return 0;
+	}
+	int connfd = *(pThreadData->pconnfd);
+	if(!writeNullTerminatedString(connfd, OK_150_CONNECTION_MSG))
+	{// send 150 message
+		return 0;
+	}
+	pThreadData->data_connfd = socket(AF_INET, SOCK_STREAM, 0);
+	if(pThreadData->data_connfd == -1)
+	{// can't open the connection
+		return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
+	}
+	if(connect(pThreadData->data_connfd, &(pThreadData->data_addr), sizeof (pThreadData->data_addr)) == -1)
+	{// can't open the connection
+		close(pThreadData->data_connfd);
+		return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
+	}
+	// data connection ok, send data now!
+	int fd = open(filename, flag);
+	char contentBuffer[BUFFER_SIZE];
+	int readLen;
+	int readfd, writefd;
+	if(flag == O_RDONLY)
+	{
+		readfd = fd;
+		writefd = pThreadData->data_connfd;
+	}
+	else{
+		readfd = pThreadData->data_connfd;
+		writefd = fd;
+	}
+	while((readLen = read(readfd, contentBuffer, BUFFER_SIZE)) == BUFFER_SIZE)
+	{
+		write(writefd, contentBuffer, readLen);
+	}
+	write(writefd, contentBuffer, readLen);
+	writeNullTerminatedString(connfd, OK_226_CONNECTION_MSG);
+	close(readfd);
+	close(writefd);
+	pThreadData->dataConnectionStatus = None_Data_Connection;
+	return 1;
+}
+
+int file_ls(const char* filename, const char* dirname)
+{
+	FILE* file = fopen(filename, "w");
+    struct DIR *mydir;
+    struct dirent *myfile;
+    struct stat mystat;
+
+    char buf[MAX_DIRECTORY_SIZE];
+    mydir = opendir(dirname);
+    while((myfile = readdir(mydir)) != NULL)
+    {
+        sprintf(buf, "%s/%s", dirname, myfile->d_name);
+        stat(buf, &mystat);
+        fprintf(file, "%zu",mystat.st_size);
+        fprintf(file, " %s\n", myfile->d_name);
+    }
+    closedir(mydir);
+	fclose(file);
+}
+
 // TODO: retr in pasv mode
 int RETR_handler(struct ThreadData* pThreadData)
 {
@@ -366,38 +433,12 @@ int RETR_handler(struct ThreadData* pThreadData)
 	// path exist and in port / pasvv mode
 	if(pThreadData->dataConnectionStatus == PORT_Data_Connection)
 	{// send data via connection
-		if(!writeNullTerminatedString(connfd, OK_150_CONNECTION_MSG))
-		{// send 150 message
-			return 0;
-		}
-		pThreadData->data_connfd = socket(AF_INET, SOCK_STREAM, 0);
-		if(pThreadData->data_connfd == -1)
-		{// can't open the connection
-			return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
-		}
-		if(connect(pThreadData->data_connfd, &(pThreadData->data_addr), sizeof (pThreadData->data_addr)) == -1)
-		{// can't open the connection
-			close(pThreadData->data_connfd);
-			return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
-		}
-		// data connection ok, send data now!
-		int fd = open(tmpDir, O_RDONLY);
-		char contentBuffer[BUFFER_SIZE];
-		int readLen;
-		while((readLen = read(fd, contentBuffer, BUFFER_SIZE)) == BUFFER_SIZE)
-		{
-			write(pThreadData->data_connfd, contentBuffer, readLen);
-		}
-		write(pThreadData->data_connfd, contentBuffer, readLen);
-		writeNullTerminatedString(connfd, OK_226_CONNECTION_MSG);
-		close(fd);
-		close(pThreadData->data_connfd);
-		pThreadData->dataConnectionStatus = None_Data_Connection;
-		return 1;
+		read_or_write_file(tmpDir, pThreadData, O_RDONLY);
 	}
+	return 1;
 }
 
-// TODO:
+// TODO: stor in pasv mode
 int STOR_handler(struct ThreadData* pThreadData)
 {
 	int thread_id = *(pThreadData->pthread_id);
@@ -408,9 +449,24 @@ int STOR_handler(struct ThreadData* pThreadData)
 	{
 		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
 	}
+	char tmpDir[MAX_DIRECTORY_SIZE];
+	if(!dispose_path(tmpDir, buffer, 5, pThreadData->cwd, root_dir))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	if(pThreadData->dataConnectionStatus == None_Data_Connection)
+	{
+		return writeNullTerminatedString(connfd, NO_DATA_CONNECTION_MSG);
+	}
+	// path exist and in port / pasvv mode
+	if(pThreadData->dataConnectionStatus == PORT_Data_Connection)
+	{// send data via connection
+		read_or_write_file(tmpDir, pThreadData, O_WRONLY);
+	}
+	return 1;
 }
 
-// TODO:
+// TODO: list in pasv mode
 int LIST_handler(struct ThreadData* pThreadData)
 {
 	int thread_id = *(pThreadData->pthread_id);
@@ -421,6 +477,65 @@ int LIST_handler(struct ThreadData* pThreadData)
 	{
 		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
 	}
+	if(pThreadData->dataConnectionStatus == None_Data_Connection)
+	{
+		return writeNullTerminatedString(connfd, NO_DATA_CONNECTION_MSG);
+	}
+	// ``tmpDir`` is the dir to be listed
+	char tmpDir[MAX_DIRECTORY_SIZE];
+	if(buffer[4] == ' ')
+	{// has pathname argument
+		if(!dispose_path(tmpDir, buffer, 5, pThreadData->cwd, root_dir))
+		{
+			return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+		}
+	}else{
+		strcpy(tmpDir, pThreadData->cwd);
+	}
+
+	// what if dir does not exist
+	struct stat tmps = {0};
+	stat(tmpDir, &tmps);
+	if(!(tmps.st_mode & S_IFDIR))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+
+	char tmpFilename[MAX_DIRECTORY_SIZE];
+	strcpy(tmpFilename, pThreadData->cwd);
+	// invoke ls and save its output to a file, then send to the client
+	// ============ append / to the last
+	char* pos = tmpFilename + strlen(tmpFilename);
+	if(*(pos - 1) != '/')
+	{
+		*pos = '/';
+		pos += 1;
+		*pos = '\0';
+	}
+	while(1)
+	{
+		// =============== try tmp file named cwd/aaaaaa until it is not a file
+		*pos = 'a';
+		pos += 1;
+		*pos = '\0';
+		struct stat s = {0};
+		stat(tmpFilename, &s);
+		if((s.st_mode & S_IFREG) || (s.st_mode & S_IFDIR))
+		{
+			continue;
+		}else{
+			break;
+		}
+	}
+	// invoke ls and save the output into the temp file
+	file_ls(tmpFilename, tmpDir);
+	// send the content
+	if(pThreadData->dataConnectionStatus == PORT_Data_Connection)
+	{// send data via connection
+		read_or_write_file(tmpFilename, pThreadData, O_RDONLY);
+	}
+	remove(tmpFilename);
+	return 1;
 }
 
 

@@ -15,6 +15,7 @@
 #include <pthread.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <dirent.h>
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
@@ -131,4 +132,19 @@ join ``cwd`` and ``command[proceding:]`` into ``buffer``,
 check if the answer exceeds ``root_dir``
 */
 int dispose_path(char* buffer, char* command, int proceding, char* cwd, char* root_dir);
+
+/*
+``flag`` can only be O_RDONLY or OWRONLY
+if flag == O_RDONLY
+    read content from ``filename`` and then send it to socket.
+if flag == OWRONLY
+    read content from the socket and then save it ito ``filename``.
+*/
+int read_or_write_file(char* filename, struct ThreadData* pThreadData, int flag);
+
+/*
+ls ``dirname`` and save the output into file.
+file will be created but not deleted.
+*/
+int file_ls(const char* filename, const char* dirname);
 #endif
