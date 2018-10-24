@@ -6,4 +6,3 @@ test : test.c common.h common.c
 
 clean : 
 	rm ./server
-	rm ./test

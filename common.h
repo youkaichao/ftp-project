@@ -59,7 +59,6 @@ enum DataConnectionStatus{
 };
 
 struct ThreadData{
-	pthread_t* pthread_id;//pointer to thread id
 	int* pconnfd;// pointer to connection file descriptor (control connection)
 	char buffer[BUFFER_SIZE]; // reading buffer
     char cwd[MAX_DIRECTORY_SIZE]; // current working directory
