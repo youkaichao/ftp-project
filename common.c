@@ -71,10 +71,8 @@ char host_ip[100] = {0};
 void *connection_thread(void *vargp)
 {
 	struct ThreadData* pThreadData = (struct ThreadData*)vargp;
-	int thread_id = *(pThreadData->pthread_id);
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
-	enum UserState userState = pThreadData->userState;
 	if(!writeNullTerminatedString(connfd, CONNECT_OK_MSG))
 	{
 		goto endConnection;
@@ -144,10 +142,8 @@ int writeNullTerminatedString(int fd, const char* str)
 
 int dispatchCommand(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
-	enum UserState userState = pThreadData->userState;
 
 	/* parse the command*/
 	char command[5];
@@ -244,9 +240,8 @@ int USER_handler(struct ThreadData* pThreadData)
 
 int PASS_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
+	
 	int connfd = *(pThreadData->pconnfd);
-	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	
 	switch (userState)
@@ -273,7 +268,7 @@ int PASS_handler(struct ThreadData* pThreadData)
 
 int PORT_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
+	
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
@@ -336,9 +331,9 @@ char* get_host_ip()
 		addr.sin_port = htons(80);
 		addr.sin_addr.s_addr = htonl(INADDR_ANY);
 		inet_pton(AF_INET, "8.8.8.8", &(addr.sin_addr.s_addr));
-		connect(listenfd, &(addr), sizeof (addr));
+		connect(listenfd, (struct sockaddr*)&(addr), sizeof (addr));
 
-		int n = sizeof addr;
+		socklen_t n = sizeof addr;
 		getsockname(listenfd, (struct sockaddr*)&addr, &n);
 		inet_ntop(AF_INET, &(addr.sin_addr), host_ip, INET_ADDRSTRLEN);
 		return host_ip;
@@ -351,7 +346,6 @@ char* get_host_ip()
 int PASV_handler(struct ThreadData* pThreadData)
 {
 	int connfd = *(pThreadData->pconnfd);
-	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState < AUTHORIZATION_LINE)
 	{
@@ -373,7 +367,7 @@ int PASV_handler(struct ThreadData* pThreadData)
 	listen(pThreadData->data_listenfd, 1);
 
 	// parse ip and port to construct the reply msg
-    int n = sizeof (pThreadData->data_addr);
+    socklen_t n = sizeof (pThreadData->data_addr);
     getsockname(pThreadData->data_listenfd, (struct sockaddr*)&(pThreadData->data_addr), &n);
 	int port = (int)(ntohs((pThreadData->data_addr).sin_port));
 	//connfd = accept(listenfd, NULL, NULL)
@@ -414,14 +408,22 @@ int read_or_write_file(char* filename, struct ThreadData* pThreadData, int flag)
 		{// can't open the connection
 			return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
 		}
-		if(connect(pThreadData->data_connfd, &(pThreadData->data_addr), sizeof (pThreadData->data_addr)) == -1)
+		if(connect(pThreadData->data_connfd, (struct sockaddr *)&(pThreadData->data_addr), sizeof (pThreadData->data_addr)) == -1)
 		{// can't open the connection
 			close(pThreadData->data_connfd);
 			return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
 		}
 	}
 	// data connection ok, send data now!
-	int fd = open(filename, flag | | O_CREAT);
+	int fd;
+	if(flag == O_RDONLY)
+	{
+		fd = open(filename, flag);
+	}
+	else{
+		// write file, create if necessary
+		fd = open(filename, flag | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+	}
 	char contentBuffer[BUFFER_SIZE];
 	int readLen;
 	int readfd, writefd;
@@ -449,7 +451,7 @@ int read_or_write_file(char* filename, struct ThreadData* pThreadData, int flag)
 int file_ls(const char* filename, const char* dirname)
 {
 	FILE* file = fopen(filename, "w");
-    struct DIR *mydir;
+    DIR *mydir;
     struct dirent *myfile;
     struct stat mystat;
 
@@ -464,12 +466,13 @@ int file_ls(const char* filename, const char* dirname)
     }
     closedir(mydir);
 	fclose(file);
+	return 1;
 }
 
 // TODO: retr in pasv mode
 int RETR_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
+	
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
@@ -508,7 +511,7 @@ int RETR_handler(struct ThreadData* pThreadData)
 // TODO: stor in pasv mode
 int STOR_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
+	
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
@@ -540,7 +543,7 @@ int STOR_handler(struct ThreadData* pThreadData)
 // TODO: list in pasv mode
 int LIST_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
+	
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
@@ -664,7 +667,7 @@ int join_path(char* patha, char* pathb)
 			left = slash_pos + 1;
 			continue;
 		}
-		if(*left == '.' && *(left + 1) == '.' & *(left + 2) == '.')
+		if(*left == '.' && *(left + 1) == '.' && *(left + 2) == '.')
 		{// have ... which is invalid
 			return 0;
 		}
@@ -674,6 +677,7 @@ int join_path(char* patha, char* pathb)
 		pos_a_end += slash_pos - left;
 		left = slash_pos + 1;
 	}
+	return 1;
 }
 
 int dispose_path(char* buffer, char* command, int proceding, char* cwd, char* root_dir)
@@ -748,7 +752,6 @@ int CWD_handler(struct ThreadData* pThreadData)
 int PWD_handler(struct ThreadData* pThreadData)
 {
 	int connfd = *(pThreadData->pconnfd);
-	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState  < AUTHORIZATION_LINE)
 	{
@@ -761,7 +764,7 @@ int PWD_handler(struct ThreadData* pThreadData)
 
 int RMD_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
+	
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
