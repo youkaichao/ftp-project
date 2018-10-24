@@ -14,6 +14,10 @@ char CREATED_PATH_MSG[] = "257 \"%s\" created!\r\n";
 char CWD_OK_MSG[] = "250 Requested file action okay, completed.\r\n";
 char PWD_OK_MSG[] = "257 \"%s\" is your current location.\r\n";
 char RMD_OK_MSG[] = "250 Requested file action okay, completed.\r\n";
+char RNFR_OK_MSG[] = "350 RNFR accepted - file exists, ready for destination\r\n";
+char RNTO_NO_RNFR_MSG[] = "503 Need RNFR before RNTO.\r\n";
+char RNTO_ERROR_MSG[] = "451 Rename/move failure.\r\n";
+char RNTO_OK_MSG[] = "250 File successfully renamed.\r\n";
 
 char* command_to_string[] = {
 [USER] = "USER", 
@@ -505,10 +509,8 @@ int RMD_handler(struct ThreadData* pThreadData)
 	}	
 }
 
-// TODO:
 int RNFR_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
@@ -516,17 +518,46 @@ int RNFR_handler(struct ThreadData* pThreadData)
 	{
 		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
 	}
+	char tmpDir[MAX_DIRECTORY_SIZE];
+	if(!dispose_path(tmpDir, buffer, 5, pThreadData->cwd, root_dir))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	struct stat s = {0};
+	stat(tmpDir, &s);
+	// it must be directory or file
+	if(!((s.st_mode & S_IFREG) || (s.st_mode & S_IFDIR)))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	pThreadData->userState = RNFR_STATE;
+	strcpy(pThreadData->RNFR_buffer, tmpDir);
+	return writeNullTerminatedString(connfd, RNFR_OK_MSG);
 }
 
-// TODO:
 int RNTO_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState < AUTHORIZATION_LINE)
 	{
 		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+	if(userState != RNFR_STATE)
+	{
+		return writeNullTerminatedString(connfd, RNTO_NO_RNFR_MSG);
+	}
+	char tmpDir[MAX_DIRECTORY_SIZE];
+	if(!dispose_path(tmpDir, buffer, 5, pThreadData->cwd, root_dir))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	pThreadData->userState = LOGGED_IN;
+	if(rename(pThreadData->RNFR_buffer, tmpDir))
+	{// something wrong
+		return writeNullTerminatedString(connfd, RNTO_ERROR_MSG);
+	}else{
+		return writeNullTerminatedString(connfd, RNTO_OK_MSG);
 	}
 }

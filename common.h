@@ -35,6 +35,10 @@ extern char WRONG_PATH_MSG[];
 extern char CREATED_PATH_MSG[];
 extern char CWD_OK_MSG[];
 extern char RMD_OK_MSG[];
+extern char RNFR_OK_MSG[];
+extern char RNTO_NO_RNFR_MSG[];
+extern char RNTO_ERROR_MSG[];
+extern char RNTO_OK_MSG[];
 
 enum UserState {
     JUST_CONNECTED, HAS_USER_NAME,
@@ -46,6 +50,7 @@ struct ThreadData{
 	int* pconnfd;// pointer to connection file descriptor
 	char buffer[BUFFER_SIZE]; // reading buffer
     char cwd[MAX_DIRECTORY_SIZE]; // current working directory
+    char RNFR_buffer[MAX_DIRECTORY_SIZE]; // buffer for saving rnfr command arguments
 	enum UserState userState;
 };
 
