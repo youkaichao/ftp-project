@@ -60,6 +60,7 @@ int main(int argc, char **argv) {
 		pthreadData->pthread_id = &thread_id;
 		pthreadData->pconnfd = &connfd;
 		pthreadData->userState = JUST_CONNECTED;
+		pthreadData->dataConnectionStatus = None_Data_Connection;
 		strcpy(pthreadData->cwd, root_dir);
 		pthread_create(&thread_id, NULL, connection_thread, (void *)pthreadData);
 	}

@@ -18,6 +18,11 @@ char RNFR_OK_MSG[] = "350 RNFR accepted - file exists, ready for destination\r\n
 char RNTO_NO_RNFR_MSG[] = "503 Need RNFR before RNTO.\r\n";
 char RNTO_ERROR_MSG[] = "451 Rename/move failure.\r\n";
 char RNTO_OK_MSG[] = "250 File successfully renamed.\r\n";
+char NO_DATA_CONNECTION_MSG[] = "425 No data connection.\r\n";
+char OK_150_CONNECTION_MSG[] = "150 about to open data connection.\r\n";
+char WRONG_425_CONNECTION_MSG[] = "425 Can't open data connection.\r\n";
+char OK_226_CONNECTION_MSG[] = "226 Closing data connection,file transfer successful.\r\n";
+char PORT_OK_MSG[] = "200 OK.\r\n";
 
 char* command_to_string[] = {
 [USER] = "USER", 
@@ -265,7 +270,6 @@ int PASS_handler(struct ThreadData* pThreadData)
 ====================== commands with data connection====================================
 */
 
-// TODO:
 int PORT_handler(struct ThreadData* pThreadData)
 {
 	int thread_id = *(pThreadData->pthread_id);
@@ -276,6 +280,48 @@ int PORT_handler(struct ThreadData* pThreadData)
 	{
 		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
 	}
+	// check if the command is legal
+	if(buffer[4] != ' ')
+	{
+		return writeNullTerminatedString(connfd, UNKNOWN_COMMAND_MSG);
+	}
+	// assume the port command is legal
+	
+	if(pThreadData->dataConnectionStatus == PASV_Data_Connection)
+	{
+		// destroy the listen socket
+		// close(pThreadData->data_connfd);
+		close(pThreadData->data_listenfd);
+	}
+	pThreadData->dataConnectionStatus = PORT_Data_Connection;
+
+	char* commas_pos[5];
+	char* start_pos = buffer + 5;
+	for(int i = 0; i < 5; ++i)
+	{
+		while(*start_pos != ',')
+		{
+			start_pos += 1;
+		}
+		commas_pos[i] = start_pos;
+		start_pos += 1;
+	}
+	start_pos = buffer + 5;// reset the start position
+	*(commas_pos[3]) = '\0';
+	*(commas_pos[4]) = '\0';
+	int p1 = atoi(commas_pos[3] + 1);
+	int p2 = atoi(commas_pos[4] + 1);
+	int port = p1 * 256 + p2;
+	for(int i = 0; i < 3; ++i)
+	{
+		*(commas_pos[i]) = '.'; // replace ',' with '.'
+	}
+	memset(&(pThreadData->data_addr), 0, sizeof(pThreadData->data_addr));
+	pThreadData->data_addr.sin_family = AF_INET;
+	pThreadData->data_addr.sin_port = htons(port);
+	inet_pton(AF_INET, start_pos, &((pThreadData->data_addr).sin_addr.s_addr));
+	// now pThreadData->data_addr is set to be an legal address
+	return writeNullTerminatedString(connfd, PORT_OK_MSG);
 }
 
 // TODO:
@@ -291,7 +337,7 @@ int PASV_handler(struct ThreadData* pThreadData)
 	}
 }
 
-// TODO:
+// TODO: retr in pasv mode
 int RETR_handler(struct ThreadData* pThreadData)
 {
 	int thread_id = *(pThreadData->pthread_id);
@@ -301,6 +347,53 @@ int RETR_handler(struct ThreadData* pThreadData)
 	if(userState < AUTHORIZATION_LINE)
 	{
 		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+	char tmpDir[MAX_DIRECTORY_SIZE];
+	if(!dispose_path(tmpDir, buffer, 5, pThreadData->cwd, root_dir))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	struct stat s = {0};
+	stat(tmpDir, &s);
+	if(!(s.st_mode & S_IFREG))
+	{
+		return writeNullTerminatedString(connfd, WRONG_PATH_MSG);
+	}
+	if(pThreadData->dataConnectionStatus == None_Data_Connection)
+	{
+		return writeNullTerminatedString(connfd, NO_DATA_CONNECTION_MSG);
+	}
+	// path exist and in port / pasvv mode
+	if(pThreadData->dataConnectionStatus == PORT_Data_Connection)
+	{// send data via connection
+		if(!writeNullTerminatedString(connfd, OK_150_CONNECTION_MSG))
+		{// send 150 message
+			return 0;
+		}
+		pThreadData->data_connfd = socket(AF_INET, SOCK_STREAM, 0);
+		if(pThreadData->data_connfd == -1)
+		{// can't open the connection
+			return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
+		}
+		if(connect(pThreadData->data_connfd, &(pThreadData->data_addr), sizeof (pThreadData->data_addr)) == -1)
+		{// can't open the connection
+			close(pThreadData->data_connfd);
+			return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
+		}
+		// data connection ok, send data now!
+		int fd = open(tmpDir, O_RDONLY);
+		char contentBuffer[BUFFER_SIZE];
+		int readLen;
+		while((readLen = read(fd, contentBuffer, BUFFER_SIZE)) == BUFFER_SIZE)
+		{
+			write(pThreadData->data_connfd, contentBuffer, readLen);
+		}
+		write(pThreadData->data_connfd, contentBuffer, readLen);
+		writeNullTerminatedString(connfd, OK_226_CONNECTION_MSG);
+		close(fd);
+		close(pThreadData->data_connfd);
+		pThreadData->dataConnectionStatus = None_Data_Connection;
+		return 1;
 	}
 }
 

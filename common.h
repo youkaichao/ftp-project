@@ -14,6 +14,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 
 #define clean_errno() (errno == 0 ? "None" : strerror(errno))
 #define log_error(M, ...) fprintf(stderr, "[ERROR] (%s:%d: errno: %s) " M "\n", __FILE__, __LINE__, clean_errno(), ##__VA_ARGS__)
@@ -39,19 +40,32 @@ extern char RNFR_OK_MSG[];
 extern char RNTO_NO_RNFR_MSG[];
 extern char RNTO_ERROR_MSG[];
 extern char RNTO_OK_MSG[];
+extern char NO_DATA_CONNECTION_MSG[];
+extern char OK_150_CONNECTION_MSG[];
+extern char WRONG_425_CONNECTION_MSG[];
+extern char OK_226_CONNECTION_MSG[];
+extern char PORT_OK_MSG[];
 
 enum UserState {
     JUST_CONNECTED, HAS_USER_NAME,
     AUTHORIZATION_LINE, // state that is less than this number can only log in 
     LOGGED_IN, RNFR_STATE};// RNFR is used for RNFR and RNTO
 
+enum DataConnectionStatus{
+    None_Data_Connection, PASV_Data_Connection, PORT_Data_Connection
+};
+
 struct ThreadData{
 	pthread_t* pthread_id;//pointer to thread id
-	int* pconnfd;// pointer to connection file descriptor
+	int* pconnfd;// pointer to connection file descriptor (control connection)
 	char buffer[BUFFER_SIZE]; // reading buffer
     char cwd[MAX_DIRECTORY_SIZE]; // current working directory
     char RNFR_buffer[MAX_DIRECTORY_SIZE]; // buffer for saving rnfr command arguments
 	enum UserState userState;
+    enum DataConnectionStatus dataConnectionStatus;
+    struct sockaddr_in data_addr;
+    int data_listenfd;// fd for server socket (if in pasv mode)
+    int data_connfd;//fd for connection socket (in pasv or port mode)
 };
 
 typedef int (*HANDLER)(struct ThreadData*);
