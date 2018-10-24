@@ -23,6 +23,7 @@ char OK_150_CONNECTION_MSG[] = "150 about to open data connection.\r\n";
 char WRONG_425_CONNECTION_MSG[] = "425 Can't open data connection.\r\n";
 char OK_226_CONNECTION_MSG[] = "226 Closing data connection,file transfer successful.\r\n";
 char PORT_OK_MSG[] = "200 OK.\r\n";
+char PASV_OK_MSG[] = "227 Entering PassiveMode (%s,%d,%d).\r\n";
 
 char* command_to_string[] = {
 [USER] = "USER", 
@@ -65,7 +66,7 @@ HANDLER handlers[] = {
 
 char root_dir[MAX_DIRECTORY_SIZE] = "/tmp";
 int host_port = 21;
-
+char host_ip[100] = {0};
 
 void *connection_thread(void *vargp)
 {
@@ -324,10 +325,31 @@ int PORT_handler(struct ThreadData* pThreadData)
 	return writeNullTerminatedString(connfd, PORT_OK_MSG);
 }
 
+char* get_host_ip()
+{
+	if(strlen(host_ip) == 0)
+	{
+		int listenfd = socket(AF_INET, SOCK_DGRAM, 0);
+		struct sockaddr_in addr;
+		memset(&addr, 0, sizeof(addr));
+		addr.sin_family = AF_INET;
+		addr.sin_port = htons(80);
+		addr.sin_addr.s_addr = htonl(INADDR_ANY);
+		inet_pton(AF_INET, "8.8.8.8", &(addr.sin_addr.s_addr));
+		connect(listenfd, &(addr), sizeof (addr));
+
+		int n = sizeof addr;
+		getsockname(listenfd, (struct sockaddr*)&addr, &n);
+		inet_ntop(AF_INET, &(addr.sin_addr), host_ip, INET_ADDRSTRLEN);
+		return host_ip;
+	}else{
+		return host_ip;
+	}
+}
+
 // TODO:
 int PASV_handler(struct ThreadData* pThreadData)
 {
-	int thread_id = *(pThreadData->pthread_id);
 	int connfd = *(pThreadData->pconnfd);
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
@@ -335,6 +357,43 @@ int PASV_handler(struct ThreadData* pThreadData)
 	{
 		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
 	}
+	// just overwrite the previous data mode
+	pThreadData->dataConnectionStatus = PASV_Data_Connection;
+
+	// create the server socket
+	pThreadData->data_listenfd = socket(AF_INET, SOCK_STREAM, 0);
+	
+	memset(&(pThreadData->data_addr), 0, sizeof(pThreadData->data_addr));
+	(pThreadData->data_addr).sin_family = AF_INET;
+	(pThreadData->data_addr).sin_port = htons(0);
+	(pThreadData->data_addr).sin_addr.s_addr = htonl(INADDR_ANY);
+
+	bind(pThreadData->data_listenfd, (struct sockaddr*)&(pThreadData->data_addr), sizeof(pThreadData->data_addr));
+
+	listen(pThreadData->data_listenfd, 1);
+
+	// parse ip and port to construct the reply msg
+    int n = sizeof (pThreadData->data_addr);
+    getsockname(pThreadData->data_listenfd, (struct sockaddr*)&(pThreadData->data_addr), &n);
+	int port = (int)(ntohs((pThreadData->data_addr).sin_port));
+	//connfd = accept(listenfd, NULL, NULL)
+	int p1 = port / 256;
+	int p2 = port % 256;
+	char ip_buffer[MAX_DIRECTORY_SIZE];
+	strcpy(ip_buffer, get_host_ip());
+	char* p = ip_buffer;
+	while(*p)
+	{
+		if(*p == '.')
+		{
+			*p = ',';
+		}
+		p += 1;
+	}
+
+	char msg_buffer[MAX_DIRECTORY_SIZE];
+	sprintf(msg_buffer, PASV_OK_MSG, ip_buffer, p1, p2);
+	return writeNullTerminatedString(connfd, msg_buffer);
 }
 
 int read_or_write_file(char* filename, struct ThreadData* pThreadData, int flag)
@@ -348,15 +407,18 @@ int read_or_write_file(char* filename, struct ThreadData* pThreadData, int flag)
 	{// send 150 message
 		return 0;
 	}
-	pThreadData->data_connfd = socket(AF_INET, SOCK_STREAM, 0);
-	if(pThreadData->data_connfd == -1)
-	{// can't open the connection
-		return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
-	}
-	if(connect(pThreadData->data_connfd, &(pThreadData->data_addr), sizeof (pThreadData->data_addr)) == -1)
-	{// can't open the connection
-		close(pThreadData->data_connfd);
-		return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
+	if(pThreadData->dataConnectionStatus == PORT_Data_Connection)
+	{
+		pThreadData->data_connfd = socket(AF_INET, SOCK_STREAM, 0);
+		if(pThreadData->data_connfd == -1)
+		{// can't open the connection
+			return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
+		}
+		if(connect(pThreadData->data_connfd, &(pThreadData->data_addr), sizeof (pThreadData->data_addr)) == -1)
+		{// can't open the connection
+			close(pThreadData->data_connfd);
+			return writeNullTerminatedString(connfd, WRONG_425_CONNECTION_MSG);
+		}
 	}
 	// data connection ok, send data now!
 	int fd = open(filename, flag);
@@ -430,10 +492,15 @@ int RETR_handler(struct ThreadData* pThreadData)
 	{
 		return writeNullTerminatedString(connfd, NO_DATA_CONNECTION_MSG);
 	}
-	// path exist and in port / pasvv mode
-	if(pThreadData->dataConnectionStatus == PORT_Data_Connection)
-	{// send data via connection
-		read_or_write_file(tmpDir, pThreadData, O_RDONLY);
+
+	if(pThreadData->dataConnectionStatus == PASV_Data_Connection)
+	{
+		pThreadData->data_connfd = accept(pThreadData->data_listenfd, NULL, NULL);
+	}
+	read_or_write_file(tmpDir, pThreadData, O_RDONLY);
+	if(pThreadData->dataConnectionStatus == PASV_Data_Connection)
+	{
+		close(pThreadData->data_listenfd);
 	}
 	return 1;
 }
@@ -458,10 +525,14 @@ int STOR_handler(struct ThreadData* pThreadData)
 	{
 		return writeNullTerminatedString(connfd, NO_DATA_CONNECTION_MSG);
 	}
-	// path exist and in port / pasvv mode
-	if(pThreadData->dataConnectionStatus == PORT_Data_Connection)
-	{// send data via connection
-		read_or_write_file(tmpDir, pThreadData, O_WRONLY);
+	if(pThreadData->dataConnectionStatus == PASV_Data_Connection)
+	{
+		pThreadData->data_connfd = accept(pThreadData->data_listenfd, NULL, NULL);
+	}
+	read_or_write_file(tmpDir, pThreadData, O_WRONLY);
+	if(pThreadData->dataConnectionStatus == PASV_Data_Connection)
+	{
+		close(pThreadData->data_listenfd);
 	}
 	return 1;
 }
@@ -529,10 +600,16 @@ int LIST_handler(struct ThreadData* pThreadData)
 	}
 	// invoke ls and save the output into the temp file
 	file_ls(tmpFilename, tmpDir);
-	// send the content
-	if(pThreadData->dataConnectionStatus == PORT_Data_Connection)
-	{// send data via connection
-		read_or_write_file(tmpFilename, pThreadData, O_RDONLY);
+
+
+	if(pThreadData->dataConnectionStatus == PASV_Data_Connection)
+	{
+		pThreadData->data_connfd = accept(pThreadData->data_listenfd, NULL, NULL);
+	}
+	read_or_write_file(tmpFilename, pThreadData, O_RDONLY);
+	if(pThreadData->dataConnectionStatus == PASV_Data_Connection)
+	{
+		close(pThreadData->data_listenfd);
 	}
 	remove(tmpFilename);
 	return 1;

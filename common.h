@@ -46,6 +46,7 @@ extern char OK_150_CONNECTION_MSG[];
 extern char WRONG_425_CONNECTION_MSG[];
 extern char OK_226_CONNECTION_MSG[];
 extern char PORT_OK_MSG[];
+extern char PASV_OK_MSG[];
 
 enum UserState {
     JUST_CONNECTED, HAS_USER_NAME,
@@ -100,6 +101,7 @@ extern HANDLER handlers[];
 
 extern char root_dir[MAX_DIRECTORY_SIZE];
 extern int host_port;
+extern char host_ip[];
 
 /*
 thread to dispose one connection
@@ -147,4 +149,9 @@ ls ``dirname`` and save the output into file.
 file will be created but not deleted.
 */
 int file_ls(const char* filename, const char* dirname);
+
+/*
+return public ip of this server
+*/
+char* get_host_ip();
 #endif
