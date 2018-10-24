@@ -56,4 +56,7 @@ int main()
     // write(connfd, msg, sizeof(msg));
     // close(connfd);
     // close(listenfd);
+    int fd = open("a.txt", O_WRONLY | O_CREAT);
+    write(fd, "123", 3);
+    close(fd);
 }

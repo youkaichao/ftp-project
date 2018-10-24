@@ -421,7 +421,7 @@ int read_or_write_file(char* filename, struct ThreadData* pThreadData, int flag)
 		}
 	}
 	// data connection ok, send data now!
-	int fd = open(filename, flag);
+	int fd = open(filename, flag | | O_CREAT);
 	char contentBuffer[BUFFER_SIZE];
 	int readLen;
 	int readfd, writefd;
