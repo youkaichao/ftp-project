@@ -59,7 +59,7 @@ enum DataConnectionStatus{
 };
 
 struct ThreadData{
-	int* pconnfd;// pointer to connection file descriptor (control connection)
+	int connfd;// connection file descriptor (control connection)
 	char buffer[BUFFER_SIZE]; // reading buffer
     char cwd[MAX_DIRECTORY_SIZE]; // current working directory
     char RNFR_buffer[MAX_DIRECTORY_SIZE]; // buffer for saving rnfr command arguments

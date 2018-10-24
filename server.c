@@ -57,7 +57,7 @@ int main(int argc, char **argv) {
 		}
 		pthread_t thread_id;
 		struct ThreadData * pthreadData = (struct ThreadData *) malloc(sizeof (struct ThreadData));
-		pthreadData->pconnfd = &connfd;
+		pthreadData->connfd = connfd;
 		pthreadData->userState = JUST_CONNECTED;
 		pthreadData->dataConnectionStatus = None_Data_Connection;
 		strcpy(pthreadData->cwd, root_dir);

@@ -71,7 +71,7 @@ char host_ip[100] = {0};
 void *connection_thread(void *vargp)
 {
 	struct ThreadData* pThreadData = (struct ThreadData*)vargp;
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	if(!writeNullTerminatedString(connfd, CONNECT_OK_MSG))
 	{
@@ -142,7 +142,7 @@ int writeNullTerminatedString(int fd, const char* str)
 
 int dispatchCommand(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 
 	/* parse the command*/
@@ -181,14 +181,14 @@ int dispatchCommand(struct ThreadData* pThreadData)
 */
 int WRONG_COMMAND_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	return writeNullTerminatedString(connfd, UNKNOWN_COMMAND_MSG);
 }
 
 
 int QUIT_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	writeNullTerminatedString(connfd, QUIT_MSG);
 	return 0;
 }
@@ -196,13 +196,13 @@ int QUIT_handler(struct ThreadData* pThreadData)
 
 int SYST_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	return writeNullTerminatedString(connfd, SYST_MSG);
 }
 
 int TYPE_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState < AUTHORIZATION_LINE)
@@ -221,7 +221,7 @@ int TYPE_handler(struct ThreadData* pThreadData)
 */
 int USER_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState > AUTHORIZATION_LINE)
@@ -241,7 +241,7 @@ int USER_handler(struct ThreadData* pThreadData)
 int PASS_handler(struct ThreadData* pThreadData)
 {
 	
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	enum UserState userState = pThreadData->userState;
 	
 	switch (userState)
@@ -269,7 +269,7 @@ int PASS_handler(struct ThreadData* pThreadData)
 int PORT_handler(struct ThreadData* pThreadData)
 {
 	
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState < AUTHORIZATION_LINE)
@@ -345,7 +345,7 @@ char* get_host_ip()
 // TODO:
 int PASV_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	enum UserState userState = pThreadData->userState;
 	if(userState < AUTHORIZATION_LINE)
 	{
@@ -396,7 +396,7 @@ int read_or_write_file(char* filename, struct ThreadData* pThreadData, int flag)
 	{
 		return 0;
 	}
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	if(!writeNullTerminatedString(connfd, OK_150_CONNECTION_MSG))
 	{// send 150 message
 		return 0;
@@ -473,7 +473,7 @@ int file_ls(const char* filename, const char* dirname)
 int RETR_handler(struct ThreadData* pThreadData)
 {
 	
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState < AUTHORIZATION_LINE)
@@ -512,7 +512,7 @@ int RETR_handler(struct ThreadData* pThreadData)
 int STOR_handler(struct ThreadData* pThreadData)
 {
 	
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState < AUTHORIZATION_LINE)
@@ -544,7 +544,7 @@ int STOR_handler(struct ThreadData* pThreadData)
 int LIST_handler(struct ThreadData* pThreadData)
 {
 	
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState  < AUTHORIZATION_LINE)
@@ -704,7 +704,7 @@ int dispose_path(char* buffer, char* command, int proceding, char* cwd, char* ro
 
 int MKD_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState < AUTHORIZATION_LINE)
@@ -727,7 +727,7 @@ int MKD_handler(struct ThreadData* pThreadData)
 
 int CWD_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState  < AUTHORIZATION_LINE)
@@ -751,7 +751,7 @@ int CWD_handler(struct ThreadData* pThreadData)
 
 int PWD_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	enum UserState userState = pThreadData->userState;
 	if(userState  < AUTHORIZATION_LINE)
 	{
@@ -765,7 +765,7 @@ int PWD_handler(struct ThreadData* pThreadData)
 int RMD_handler(struct ThreadData* pThreadData)
 {
 	
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState  < AUTHORIZATION_LINE)
@@ -799,7 +799,7 @@ int RMD_handler(struct ThreadData* pThreadData)
 
 int RNFR_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState  < AUTHORIZATION_LINE)
@@ -825,7 +825,7 @@ int RNFR_handler(struct ThreadData* pThreadData)
 
 int RNTO_handler(struct ThreadData* pThreadData)
 {
-	int connfd = *(pThreadData->pconnfd);
+	int connfd = pThreadData->connfd;
 	char* buffer = pThreadData->buffer;
 	enum UserState userState = pThreadData->userState;
 	if(userState < AUTHORIZATION_LINE)
