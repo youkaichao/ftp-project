@@ -37,6 +37,7 @@ extern char SYST_MSG[];
 extern char WRONG_PATH_MSG[];
 extern char CREATED_PATH_MSG[];
 extern char CWD_OK_MSG[];
+extern char PWD_OK_MSG[];
 extern char RMD_OK_MSG[];
 extern char RNFR_OK_MSG[];
 extern char RNTO_NO_RNFR_MSG[];

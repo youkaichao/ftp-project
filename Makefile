@@ -1,8 +1,5 @@
-server : server.c common.h common.c
-	gcc -Wall -g -o server server.c common.c -lpthread common.h
-
-test : test.c common.h common.c
-	gcc -Wall -g -o test test.c common.c -lpthread common.h
+server : common.h global.c server.c lib.c handlers.c
+	gcc -Wall -g -o server $^ -lpthread
 
 clean : 
 	rm ./server
