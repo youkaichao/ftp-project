@@ -61,12 +61,25 @@ class User(object):
         if self.mode == User.PORT_MODE:
             conn, addres = self.data_socket.accept()
             self.data_socket = conn
-        data = rec_all(self.data_socket)
+
+        def rec_all_data(sock):
+            allData = ''
+            while True:
+                data = sock.recv(BUFFER_SIZE)
+                allData += data
+                if not data:
+                    return allData
+
+        data = rec_all_data(self.data_socket)
         self.close_data_socket()
         return data
 
     def send_all_data(self, data):
-        self.data_socket.sendall(data)
+        indexes = list(range(len(data)))
+        if len(data):
+            for each in indexes[::BUFFER_SIZE]:
+                each = data[each:min(each + BUFFER_SIZE, len(data))]
+                self.data_socket.sendall(each)
         self.close_data_socket()
 
     def connect_data_socket(self):
