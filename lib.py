@@ -22,15 +22,6 @@ def get_host_ip():
         return HOST_IP
 
 
-def rec_all(sock):
-    allData = ''
-    while True:
-        data = sock.recv(BUFFER_SIZE)
-        allData += data
-        if len(data) < BUFFER_SIZE:
-            return allData
-
-
 class User(object):
     PASSIVE = 0
     PORT_MODE = 1
@@ -53,7 +44,24 @@ class User(object):
 
     def read_all_control(self):
         # control connection read, the reply from the server should always be printed out to the user
-        data = rec_all(self.control_socket)
+        def rec_all_control(sock):
+            lines = []
+            remains = ''
+            while True:
+                data = sock.recv(BUFFER_SIZE)
+                remains += data
+                # server response ends with CRLF
+                if remains.endswith('\r\n'):
+                    # the last element returned by split is empty string
+                    lines += remains.split('\r\n')[:-1]
+                    remains = ''
+                    # control data ends with "xxx <space> whatever"
+                    if lines[-1][3] == ' ':
+                        break
+            lines = [x + '\r\n' for x in lines]
+            return ''.join(lines)
+
+        data = rec_all_control(self.control_socket)
         print(data)
         return data
 
