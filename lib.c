@@ -176,11 +176,15 @@ int read_or_write_file(char* filename, struct ThreadData* pThreadData, int flag)
 		readfd = pThreadData->data_connfd;
 		writefd = fd;
 	}
-	while((readLen = read(readfd, contentBuffer, BUFFER_SIZE)) == BUFFER_SIZE)
+	while(1)
 	{
+		readLen = read(readfd, contentBuffer, BUFFER_SIZE);
+		if(!readLen)
+		{
+			break;
+		}
 		write(writefd, contentBuffer, readLen);
 	}
-	write(writefd, contentBuffer, readLen);
 	writeNullTerminatedString(connfd, OK_226_CONNECTION_MSG);
 	close(readfd);
 	close(writefd);
