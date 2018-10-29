@@ -153,7 +153,7 @@ def retr_handler(command):
     user.connect_data_socket()
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
-    if not data.startswith('150'):
+    if not data.startswith('150') and not data.startswith('125'):
         raise Exception('wrong return code!')
     data = user.read_all_data()
     filename = command[command.index(' ') + 1:].strip()
@@ -166,7 +166,7 @@ def list_handler(command):
     user.connect_data_socket()
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
-    if not data.startswith('150'):
+    if not data.startswith('150') and not data.startswith('125'):
         raise Exception('wrong return code!')
     data = user.read_all_data()
     user.read_all_control()
@@ -182,7 +182,7 @@ def stor_handler(command):
     user.connect_data_socket()
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
-    if not data.startswith('150'):
+    if not data.startswith('150') and not data.startswith('125'):
         raise Exception('wrong return code!')
     with open(filename, 'rb') as f:
         data = f.read()
