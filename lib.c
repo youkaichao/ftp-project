@@ -203,22 +203,24 @@ int read_or_write_file(char *filename, struct ThreadData *pThreadData, int flag)
 
 int file_ls(const char *filename, const char *dirname)
 {
+	char command[MAX_DIRECTORY_SIZE];
+	sprintf(command, "ls %s -lh", dirname);
+	FILE *ls_output = popen(command, "r");
 	FILE *file = fopen(filename, "w");
-	DIR *mydir;
-	struct dirent *myfile;
-	struct stat mystat;
 
 	char buf[MAX_DIRECTORY_SIZE];
-	mydir = opendir(dirname);
-	while ((myfile = readdir(mydir)) != NULL)
+	while (1)
 	{
-		sprintf(buf, "%s/%s", dirname, myfile->d_name);
-		stat(buf, &mystat);
-		fprintf(file, "%zu", mystat.st_size);
-		fprintf(file, " %s\n", myfile->d_name);
+		int num = fread(buf, 1, MAX_DIRECTORY_SIZE, ls_output);
+		if (!num)
+		{
+			break;
+		}
+		fwrite(buf, 1, num, file);
 	}
-	closedir(mydir);
+
 	fclose(file);
+	fclose(ls_output);
 	return 1;
 }
 
