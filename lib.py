@@ -83,6 +83,8 @@ class User(object):
         return data
 
     def send_all_data(self, data):
+        if user.mode == User.PORT_MODE:
+            self.data_socket, address = self.data_socket.accept()
         indexes = list(range(len(data)))
         if len(data):
             for each in indexes[::BUFFER_SIZE]:
@@ -110,7 +112,7 @@ class User(object):
             params = get_host_ip().replace('.', ',') + ',%s,%s'%(p1, p2)
             user.control_socket.sendall("PORT " + params + '\r\n')
             data = user.read_all_control()
-
+            
 
 user = User() # single instance
 
