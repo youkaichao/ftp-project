@@ -19,7 +19,7 @@ int main(int argc, char **argv)
 		}
 		else
 		{
-			assertf(1 > 2, "Wrong input arguments!(must be (--port n --root /path) or (--root /path --port n))");
+			assertf(1 > 2, "Wrong input arguments!(must be (-port n --root /path) or (-root /path --port n))");
 		}
 		// make sure the root dir doesn't have the slash as its end.
 		char *p = root_dir;
@@ -69,6 +69,7 @@ int main(int argc, char **argv)
 		pthreadData->connfd = connfd;
 		pthreadData->userState = JUST_CONNECTED;
 		pthreadData->dataConnectionStatus = None_Data_Connection;
+		pthreadData->rest_position = 0;
 		strcpy(pthreadData->cwd, root_dir);
 		pthread_create(&thread_id, NULL, connection_thread, (void *)pthreadData);
 	}

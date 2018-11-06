@@ -23,6 +23,7 @@ char OK_150_CONNECTION_MSG[] = "150 about to open data connection.\r\n";
 char WRONG_425_CONNECTION_MSG[] = "425 Can't open data connection.\r\n";
 char OK_226_CONNECTION_MSG[] = "226 Closing data connection,file transfer successful.\r\n";
 char PORT_OK_MSG[] = "200 OK.\r\n";
+char REST_OK_MSG[] = "200 OK. set to %d \r\n";
 char PASV_OK_MSG[] = "227 Entering PassiveMode (%s,%d,%d).\r\n";
 
 char *command_to_string[] = {
@@ -42,6 +43,7 @@ char *command_to_string[] = {
     [RMD] = "RMD",
     [RNFR] = "RNFR",
     [RNTO] = "RNTO",
+    [REST] = "REST",
 };
 
 HANDLER handlers[] = {
@@ -61,6 +63,7 @@ HANDLER handlers[] = {
     [RMD] = RMD_handler,
     [RNFR] = RNFR_handler,
     [RNTO] = RNTO_handler,
+    [REST] = REST_handler,
     [NUM_OF_COMMANDS] = WRONG_COMMAND_handler};
 
 char root_dir[MAX_DIRECTORY_SIZE] = "/tmp";

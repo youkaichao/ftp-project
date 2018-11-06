@@ -55,6 +55,7 @@ extern char WRONG_425_CONNECTION_MSG[];
 extern char OK_226_CONNECTION_MSG[];
 extern char PORT_OK_MSG[];
 extern char PASV_OK_MSG[];
+extern char REST_OK_MSG[];
 
 enum UserState
 {
@@ -83,6 +84,7 @@ struct ThreadData
     struct sockaddr_in data_addr;
     int data_listenfd; // fd for server socket (if in pasv mode)
     int data_connfd;   //fd for connection socket (in pasv or port mode)
+    int rest_position; // position for rest command (for retr/stor command)
 };
 
 typedef int (*HANDLER)(struct ThreadData *);
@@ -103,6 +105,7 @@ int LIST_handler(struct ThreadData *pThreadData);
 int RMD_handler(struct ThreadData *pThreadData);
 int RNFR_handler(struct ThreadData *pThreadData);
 int RNTO_handler(struct ThreadData *pThreadData);
+int REST_handler(struct ThreadData *pThreadData);
 int WRONG_COMMAND_handler(struct ThreadData *pThreadData);
 
 enum COMMANDS
@@ -123,6 +126,7 @@ enum COMMANDS
     RMD,
     RNFR,
     RNTO,
+    REST,
     NUM_OF_COMMANDS
 };
 

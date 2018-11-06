@@ -338,6 +338,24 @@ int LIST_handler(struct ThreadData *pThreadData)
 	return 1;
 }
 
+int REST_handler(struct ThreadData *pThreadData)
+{
+	int connfd = pThreadData->connfd;
+	enum UserState userState = pThreadData->userState;
+	if (userState < AUTHORIZATION_LINE)
+	{
+		return writeNullTerminatedString(connfd, NOT_LOGGED_IN_MSG);
+	}
+
+	char *buffer = pThreadData->buffer;
+	int x;
+	sscanf(buffer + 5, "%d", &x);
+	pThreadData->rest_position = x;
+	char tmp[BUFFER_SIZE];
+	sprintf(tmp, REST_OK_MSG, x);
+	return writeNullTerminatedString(connfd, tmp);
+}
+
 /*
 ====================== directory related commands ====================================
 */

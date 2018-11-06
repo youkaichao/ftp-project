@@ -169,9 +169,18 @@ int read_or_write_file(char *filename, struct ThreadData *pThreadData, int flag)
 	}
 	else
 	{
-		// write file, create if necessary
-		fd = open(filename, flag | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+		if (pThreadData->rest_position)
+		{ // start from some position, file already exist
+			fd = open(filename, flag | O_APPEND, S_IRWXU | S_IRWXG | S_IRWXO);
+		}
+		else
+		{
+			// write file, create if necessary
+			fd = open(filename, flag | O_CREAT, S_IRWXU | S_IRWXG | S_IRWXO);
+		}
 	}
+	lseek(fd, pThreadData->rest_position, SEEK_SET);
+	pThreadData->rest_position = 0;
 	char contentBuffer[BUFFER_SIZE];
 	int readLen;
 	int readfd, writefd;
