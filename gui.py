@@ -1,10 +1,10 @@
 from gui_lib import *
 
-app = QtWidgets.QApplication(sys.argv)
-MainWindow = QtWidgets.QMainWindow()
-ui.setupUi(MainWindow)
+
 
 ui.login_button.clicked.connect(login_dispatcher)
+ui.portRadioButton.clicked.connect((lambda : name_to_command['SETPORT'].invoke('SETPORT')))
+ui.pasvRadioButton.clicked.connect((lambda : name_to_command['SETPASV'].invoke('SETPASV')))
 gui_logout()
 
 ui.ip_input.setText("144.208.69.31")

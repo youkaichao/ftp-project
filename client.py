@@ -8,20 +8,20 @@ def execute_one_session():
         ip = raw_input('please input server ip:').strip()
         port = raw_input('please input server port:').strip()
         port = int(port)
-        error = connect_command.invoke(ip, port)
-        socket_connected = not error
+        output = connect_command.invoke(ip, port)
+        socket_connected = not isinstance(output, Exception)
 
     username_accepted = False
     while not username_accepted:
         username = raw_input('please input username:').strip()
-        error = user_command.invoke(username)
-        username_accepted = not error
+        output = user_command.invoke(username)
+        username_accepted = not isinstance(output, Exception)
 
     password_accepted = False
     while not password_accepted:
         password = raw_input('please input password:').strip()
-        error = pass_command.invoke(password)
-        password_accepted = not error
+        output = pass_command.invoke(password)
+        password_accepted = not isinstance(output, Exception)
 
     user.control_socket.sendall('TYPE I' + '\r\n')
     user.read_all_control()

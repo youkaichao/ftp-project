@@ -197,13 +197,6 @@
          </item>
         </layout>
        </item>
-       <item>
-        <widget class="QPushButton" name="upload_button">
-         <property name="text">
-          <string>upload</string>
-         </property>
-        </widget>
-       </item>
       </layout>
      </item>
      <item>
@@ -241,13 +234,6 @@
           <widget class="QListWidget" name="remote_files"/>
          </item>
         </layout>
-       </item>
-       <item>
-        <widget class="QPushButton" name="download_button">
-         <property name="text">
-          <string>download</string>
-         </property>
-        </widget>
        </item>
       </layout>
      </item>

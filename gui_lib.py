@@ -1,20 +1,89 @@
 from lib import *
 import traceback
 from window import *
+from functools import partial
+import sys
 ui = Ui_MainWindow()
+app = QtWidgets.QApplication(sys.argv)
+MainWindow = QtWidgets.QMainWindow()
+ui.setupUi(MainWindow)
 
 
+# redirect print to the text_display widget
 class FakeFile(object):
     @classmethod
     def write(whatever, what):
         ui.text_display.append(what)
-        # ui.text_display.setText(ui.text_display.toPlainText() + what)
 
 
-import sys
 sys.stdout = FakeFile
 sys.stderr = FakeFile
 import os
+
+
+class DirectoryView:
+    def __init__(self, listView, directory_label, is_local=True):
+        # store the reference
+        self.listView = listView
+        self.directory_label = directory_label
+        self.is_local = is_local
+        self.items = []
+
+    def _is_dir(self, path_name):
+        if self.is_local:
+            return os.path.isdir(path_name)
+        control, data = name_to_command['CWD'].invoke('cwd ' + path_name)
+        return control.startswith('200')
+
+    def _add_button(self, text):
+
+        def on_click(btn):
+            if btn.text() == '..':
+                # change to upper directory
+                self.directory_label.setText(os.path.dirname(self.directory_label.text()))
+                self.update()
+                return
+            new_path = os.path.join(self.directory_label.text(), btn.text())
+            if self._is_dir(new_path):
+                self.directory_label.setText(new_path)
+                self.update()
+                return
+
+        button = QtWidgets.QPushButton()
+        button.setText(text)
+        itemN = QtWidgets.QListWidgetItem()
+        self.listView.addItem(itemN)
+        self.listView.setItemWidget(itemN, button)
+        self.items.append(itemN)
+        button.clicked.connect(partial(on_click, button))
+
+    def _list_directory(self):
+        cwd = self.directory_label.text()
+        if self.is_local:
+            return os.listdir(cwd)
+        else:
+            control, data = name_to_command['LIST'].invoke('list ' + cwd)
+            lines = [line.strip() for line in data.splitlines()]
+            i = [i for (i, line) in enumerate(lines) if line.endswith('..')][0]
+            return [line.split()[-1] for line in lines[i + 1 :]]
+
+    def clear(self):
+        for item in self.items:
+            self.listView.removeItemWidget(item)
+        self.items = []
+
+    def update(self):
+        # list the directory and create each button
+        # clear previous buttons
+        self.clear()
+        self._add_button("..")
+        files = self._list_directory()
+        for file in files:
+            self._add_button(file)
+
+
+local_directory_view = DirectoryView(ui.local_files, ui.local_directory, is_local=True)
+remote_directory_view = DirectoryView(ui.remote_files, ui.remote_directory, is_local=False)
 
 
 def gui_logout():
@@ -23,12 +92,14 @@ def gui_logout():
     for x in texts:
         x.setText("")
     for x in radios:
+        x.setChecked(False)
         x.setEnabled(False)
+
     ui.login_button.setText("login")
     ui.local_directory.setText("")
     ui.remote_directory.setText("")
-    ui.upload_button.setEnabled(False)
-    ui.download_button.setEnabled(False)
+    local_directory_view.clear()
+    remote_directory_view.clear()
     user.is_logged_in = False
     user.close_control_socket()
 
@@ -48,14 +119,14 @@ def error_handler(func):
 def gui_login():
     ip = ui.ip_input.text().strip()
     port = int(ui.port_input.text().strip())
-    error = connect_command.invoke(ip, port)
-    if error:
+    output = connect_command.invoke(ip, port)
+    if isinstance(output, Exception):
         return
-    error = user_command.invoke(ui.username_input.text().strip())
-    if error:
+    output = user_command.invoke(ui.username_input.text().strip())
+    if isinstance(output, Exception):
         return
-    error = pass_command.invoke(ui.password_input.text().strip())
-    if error:
+    output = pass_command.invoke(ui.password_input.text().strip())
+    if isinstance(output, Exception):
         return
     user.control_socket.sendall('TYPE I' + '\r\n')
     user.read_all_control()
@@ -63,13 +134,15 @@ def gui_login():
     radios = [ui.pasvRadioButton, ui.portRadioButton]
     for x in radios:
         x.setEnabled(True)
-    ui.upload_button.setEnabled(True)
-    ui.download_button.setEnabled(True)
+    ui.pasvRadioButton.setChecked(True)
     ui.local_directory.setText(os.getcwd())
     # get remote directory
-    name_to_command['PWD'].invoke('pwd')
-    response = ui.text_display.toPlainText().splitlines()[-2]
-    ui.remote_directory.setText(response.split('\"')[1])
+    output = name_to_command['PWD'].invoke('pwd')
+    control = output[0]
+    ui.remote_directory.setText(control.split('\"')[1])
+    local_directory_view.update()
+    remote_directory_view.update()
+
 
 def login_dispatcher():
     if ui.login_button.text() == "login":

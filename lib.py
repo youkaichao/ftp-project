@@ -126,8 +126,7 @@ class Command(object):
 
     def invoke(self, *args):
         try:
-            self.handler(*args)
-            return None
+            return self.handler(*args)
         except Exception as e:
             traceback.print_exc()
             print(e.message)
@@ -140,7 +139,7 @@ def connect_handler(ip, port):
     data = user.read_all_control()
     if data[:3] != '220':
         raise Exception('connection failed!')
-    return
+    return data, ''
 
 
 connect_command = Command('connect', '', connect_handler)
@@ -152,7 +151,7 @@ def user_handler(username):
     data = user.read_all_control()
     if data[:3] != '331':
         raise Exception('username not OK')
-    return
+    return data, ''
 
 
 user_command = Command('user', '', user_handler)
@@ -166,37 +165,44 @@ def password_handler(password):
         user.is_logged_in = True
     else:
         raise Exception('wrong password!')
-    return
+    return data, ''
 
 
 pass_command = Command('pass', '', password_handler)
 
 
 def retr_handler(command):
+    control_out = ''
     user.connect_data_socket()
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
+    control_out += data
     if not data.startswith('150') and not data.startswith('125'):
         raise Exception('wrong return code!')
     data = user.read_all_data()
     filename = command[command.index(' ') + 1:].strip()
     with open(filename, 'wb') as f:
         f.write(data)
-    user.read_all_control()
-
+    control_out += user.read_all_control()
+    return control_out, ''
 
 def list_handler(command):
+    control_out = ''
+    data_out = ''
     user.connect_data_socket()
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
+    control_out += data
     if not data.startswith('150') and not data.startswith('125'):
         raise Exception('wrong return code!')
-    data = user.read_all_data()
-    user.read_all_control()
-    print(data)
+    data_out = user.read_all_data()
+    control_out += user.read_all_control()
+    print(data_out)
+    return control_out, data_out
 
 
 def stor_handler(command):
+    control_out = ''
     filename = command[command.index(' ') + 1:].strip()
     import os
     if not (os.path.exists(filename) and os.path.isfile(filename)):
@@ -205,19 +211,21 @@ def stor_handler(command):
     user.connect_data_socket()
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
+    control_out += data
     if not data.startswith('150') and not data.startswith('125'):
         raise Exception('wrong return code!')
     with open(filename, 'rb') as f:
         data = f.read()
     user.send_all_data(data)
-    user.read_all_control()
+    control_out += user.read_all_control()
+    return control_out, ''
 
 
 def default_handler(command):
     # just send the command and then print the response from the server
     user.control_socket.sendall(command + '\r\n')
     data = user.read_all_control()
-
+    return data, ''
 
 def setPortHandler(command):
     user.mode = User.PORT_MODE
@@ -241,7 +249,7 @@ def quit_handler(command):
     data = user.read_all_control()
     user.is_logged_in = False
     user.close_control_socket()
-    return
+    return data, ''
 
 
 def exit_handler(command):
