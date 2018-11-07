@@ -30,13 +30,13 @@ class DirectoryView:
         self.listView = listView
         self.directory_label = directory_label
         self.is_local = is_local
-        self.items = []
+        self.buttons = []
 
     def _is_dir(self, path_name):
         if self.is_local:
             return os.path.isdir(path_name)
         control, data = name_to_command['CWD'].invoke('cwd ' + path_name)
-        return control.startswith('200')
+        return control.startswith('250')
 
     def _add_button(self, text):
 
@@ -55,10 +55,10 @@ class DirectoryView:
             user.local_cwd = DirectoryView.local_directory_view.directory_label.text()
             user.remote_cwd = DirectoryView.remote_directory_view.directory_label.text()
             if self.is_local:
-                control, data = name_to_command['STOR'].invoke('stor ' + btn.text())
+                name_to_command['STOR'].invoke('stor ' + btn.text())
                 DirectoryView.remote_directory_view.update()
             else:
-                control, data = name_to_command['RETR'].invoke('retr ' + btn.text())
+                name_to_command['RETR'].invoke('retr ' + btn.text())
                 DirectoryView.local_directory_view.update()
 
         button = QtWidgets.QPushButton()
@@ -66,7 +66,7 @@ class DirectoryView:
         itemN = QtWidgets.QListWidgetItem()
         self.listView.addItem(itemN)
         self.listView.setItemWidget(itemN, button)
-        self.items.append(itemN)
+        self.buttons.append(button)
         button.clicked.connect(partial(on_click, button))
 
     def _list_directory(self):
@@ -80,9 +80,11 @@ class DirectoryView:
             return [line.split()[-1] for line in lines[i + 1 :]]
 
     def clear(self):
-        for item in self.items:
-            self.listView.removeItemWidget(item)
-        self.items = []
+        for btn in self.buttons:
+            self.listView.takeItem(0)
+        for btn in self.buttons:
+            btn.deleteLater()
+        self.buttons = []
 
     def update(self):
         # list the directory and create each button
