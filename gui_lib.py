@@ -62,8 +62,13 @@ class DirectoryView:
                 DirectoryView.local_directory_view.update()
 
         button = QtWidgets.QPushButton()
+        button.setMinimumHeight(15)
+        font = button.font()
+        font.setPointSize(10)
+        button.setFont(font)
         button.setText(text)
         itemN = QtWidgets.QListWidgetItem()
+        itemN.setSizeHint(button.sizeHint())
         self.listView.addItem(itemN)
         self.listView.setItemWidget(itemN, button)
         self.buttons.append(button)
