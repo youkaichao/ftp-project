@@ -1,10 +1,10 @@
 from gui_lib import *
 
-
-
 ui.login_button.clicked.connect(login_dispatcher)
 ui.portRadioButton.clicked.connect((lambda : name_to_command['SETPORT'].invoke('SETPORT')))
 ui.pasvRadioButton.clicked.connect((lambda : name_to_command['SETPASV'].invoke('SETPASV')))
+ui.new_local_folder.clicked.connect(create_local_folder)
+ui.new_remote_folder.clicked.connect(create_remote_folder)
 gui_logout()
 
 ui.ip_input.setText("144.208.69.31")

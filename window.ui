@@ -151,16 +151,16 @@
      </item>
     </layout>
    </widget>
-   <widget class="QWidget" name="layoutWidget">
+   <widget class="QWidget" name="">
     <property name="geometry">
      <rect>
-      <x>0</x>
-      <y>60</y>
-      <width>1011</width>
-      <height>242</height>
+      <x>10</x>
+      <y>62</y>
+      <width>1026</width>
+      <height>240</height>
      </rect>
     </property>
-    <layout class="QHBoxLayout" name="horizontalLayout_9">
+    <layout class="QHBoxLayout" name="horizontalLayout_7">
      <item>
       <spacer name="horizontalSpacer">
        <property name="orientation">
@@ -175,27 +175,37 @@
       </spacer>
      </item>
      <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_7">
+      <layout class="QVBoxLayout" name="verticalLayout">
        <item>
-        <layout class="QVBoxLayout" name="verticalLayout">
-         <item>
-          <widget class="QLabel" name="label_6">
-           <property name="text">
-            <string>local directory</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="local_directory">
-           <property name="text">
-            <string>.</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QListWidget" name="local_files"/>
-         </item>
-        </layout>
+        <widget class="QLabel" name="label_6">
+         <property name="text">
+          <string>local directory</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="local_directory">
+         <property name="text">
+          <string>.</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QListWidget" name="local_files"/>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_4">
+       <item>
+        <widget class="QLineEdit" name="new_local_folder_name"/>
+       </item>
+       <item>
+        <widget class="QPushButton" name="new_local_folder">
+         <property name="text">
+          <string>new folder</string>
+         </property>
+        </widget>
        </item>
       </layout>
      </item>
@@ -213,27 +223,37 @@
       </spacer>
      </item>
      <item>
-      <layout class="QHBoxLayout" name="horizontalLayout_8">
+      <layout class="QVBoxLayout" name="verticalLayout_2">
        <item>
-        <layout class="QVBoxLayout" name="verticalLayout_2">
-         <item>
-          <widget class="QLabel" name="label_8">
-           <property name="text">
-            <string>remote directory</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QLabel" name="remote_directory">
-           <property name="text">
-            <string>.</string>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QListWidget" name="remote_files"/>
-         </item>
-        </layout>
+        <widget class="QLabel" name="label_8">
+         <property name="text">
+          <string>remote directory</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QLabel" name="remote_directory">
+         <property name="text">
+          <string>.</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QListWidget" name="remote_files"/>
+       </item>
+      </layout>
+     </item>
+     <item>
+      <layout class="QVBoxLayout" name="verticalLayout_5">
+       <item>
+        <widget class="QLineEdit" name="new_remote_folder_name"/>
+       </item>
+       <item>
+        <widget class="QPushButton" name="new_remote_folder">
+         <property name="text">
+          <string>new folder</string>
+         </property>
+        </widget>
        </item>
       </layout>
      </item>

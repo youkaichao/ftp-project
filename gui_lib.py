@@ -106,6 +106,8 @@ def gui_logout():
     for x in radios:
         x.setChecked(False)
         x.setEnabled(False)
+    ui.new_local_folder.setEnabled(False)
+    ui.new_remote_folder.setEnabled(False)
 
     ui.login_button.setText("login")
     ui.local_directory.setText("")
@@ -146,6 +148,8 @@ def gui_login():
     radios = [ui.pasvRadioButton, ui.portRadioButton]
     for x in radios:
         x.setEnabled(True)
+    ui.new_local_folder.setEnabled(True)
+    ui.new_remote_folder.setEnabled(True)
     ui.pasvRadioButton.setChecked(True)
     ui.local_directory.setText(os.getcwd())
     # get remote directory
@@ -162,3 +166,25 @@ def login_dispatcher():
     else:
         name_to_command['QUIT'].invoke('quit')
         gui_logout()
+
+
+def create_local_folder():
+    new_local_folder_name = ui.new_local_folder_name.text().strip()
+    if not new_local_folder_name:
+        QtWidgets.QMessageBox.warning(None, 'warning', 'empty directory name')
+        return
+    cwd = DirectoryView.local_directory_view.directory_label.text()
+    path_name = os.path.join(cwd, new_local_folder_name)
+    os.mkdir(path_name)
+    DirectoryView.local_directory_view.update()
+
+
+def create_remote_folder():
+    new_remote_folder_name = ui.new_remote_folder_name.text().strip()
+    if not new_remote_folder_name:
+        QtWidgets.QMessageBox.warning(None, 'warning', 'empty directory name')
+        return
+    cwd = DirectoryView.remote_directory_view.directory_label.text()
+    path_name = os.path.join(cwd, new_remote_folder_name)
+    output = name_to_command['MKD'].invoke('mkd ' + path_name)
+    DirectoryView.remote_directory_view.update()
