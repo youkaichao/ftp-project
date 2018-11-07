@@ -7,7 +7,8 @@ ui = Ui_MainWindow()
 class FakeFile(object):
     @classmethod
     def write(whatever, what):
-        ui.text_display.setText(ui.text_display.toPlainText() + what)
+        ui.text_display.append(what)
+        # ui.text_display.setText(ui.text_display.toPlainText() + what)
 
 
 import sys
