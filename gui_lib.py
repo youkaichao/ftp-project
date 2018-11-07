@@ -22,6 +22,9 @@ import os
 
 
 class DirectoryView:
+    local_directory_view = None
+    remote_directory_view = None
+
     def __init__(self, listView, directory_label, is_local=True):
         # store the reference
         self.listView = listView
@@ -48,6 +51,15 @@ class DirectoryView:
                 self.directory_label.setText(new_path)
                 self.update()
                 return
+            # dispose file click
+            user.local_cwd = DirectoryView.local_directory_view.directory_label.text()
+            user.remote_cwd = DirectoryView.remote_directory_view.directory_label.text()
+            if self.is_local:
+                control, data = name_to_command['STOR'].invoke('stor ' + btn.text())
+                DirectoryView.remote_directory_view.update()
+            else:
+                control, data = name_to_command['RETR'].invoke('retr ' + btn.text())
+                DirectoryView.local_directory_view.update()
 
         button = QtWidgets.QPushButton()
         button.setText(text)
@@ -82,8 +94,8 @@ class DirectoryView:
             self._add_button(file)
 
 
-local_directory_view = DirectoryView(ui.local_files, ui.local_directory, is_local=True)
-remote_directory_view = DirectoryView(ui.remote_files, ui.remote_directory, is_local=False)
+DirectoryView.local_directory_view = DirectoryView(ui.local_files, ui.local_directory, is_local=True)
+DirectoryView.remote_directory_view = DirectoryView(ui.remote_files, ui.remote_directory, is_local=False)
 
 
 def gui_logout():
@@ -98,8 +110,8 @@ def gui_logout():
     ui.login_button.setText("login")
     ui.local_directory.setText("")
     ui.remote_directory.setText("")
-    local_directory_view.clear()
-    remote_directory_view.clear()
+    DirectoryView.local_directory_view.clear()
+    DirectoryView.remote_directory_view.clear()
     user.is_logged_in = False
     user.close_control_socket()
 
@@ -140,8 +152,8 @@ def gui_login():
     output = name_to_command['PWD'].invoke('pwd')
     control = output[0]
     ui.remote_directory.setText(control.split('\"')[1])
-    local_directory_view.update()
-    remote_directory_view.update()
+    DirectoryView.local_directory_view.update()
+    DirectoryView.remote_directory_view.update()
 
 
 def login_dispatcher():

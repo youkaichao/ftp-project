@@ -1,4 +1,5 @@
 import re
+import os
 import socket
 import traceback
 BUFFER_SIZE = 1024
@@ -27,6 +28,8 @@ class User(object):
     PORT_MODE = 1
 
     def __init__(self):
+        self.local_cwd = os.getcwd()
+        self.remote_cwd = ''
         self.username = ''
         self.password = ''
         self.mode = User.PASSIVE
@@ -163,6 +166,9 @@ def password_handler(password):
     data = user.read_all_control()
     if data[:3] == '230':
         user.is_logged_in = True
+        output = name_to_command['PWD'].invoke('pwd')
+        control = output[0]
+        user.remote_cwd = control.split('\"')[1]
     else:
         raise Exception('wrong password!')
     return data, ''
@@ -181,7 +187,7 @@ def retr_handler(command):
         raise Exception('wrong return code!')
     data = user.read_all_data()
     filename = command[command.index(' ') + 1:].strip()
-    with open(filename, 'wb') as f:
+    with open(os.path.join(user.local_cwd, filename), 'wb') as f:
         f.write(data)
     control_out += user.read_all_control()
     return control_out, ''
@@ -204,8 +210,8 @@ def list_handler(command):
 def stor_handler(command):
     control_out = ''
     filename = command[command.index(' ') + 1:].strip()
-    import os
-    if not (os.path.exists(filename) and os.path.isfile(filename)):
+    abs_path = os.path.join(user.local_cwd, filename)
+    if not (os.path.exists(abs_path) and os.path.isfile(abs_path)):
         print("'%s' not exists!" % (filename))
         return
     user.connect_data_socket()
@@ -214,7 +220,7 @@ def stor_handler(command):
     control_out += data
     if not data.startswith('150') and not data.startswith('125'):
         raise Exception('wrong return code!')
-    with open(filename, 'rb') as f:
+    with open(abs_path, 'rb') as f:
         data = f.read()
     user.send_all_data(data)
     control_out += user.read_all_control()
@@ -251,6 +257,13 @@ def quit_handler(command):
     user.close_control_socket()
     return data, ''
 
+def cwd_handler(command):
+    user.control_socket.sendall(command + '\r\n')
+    directory = command[command.index(' ') + 1:].strip()
+    data = user.read_all_control()
+    if data.startswith('200'):
+        user.remote_cwd = os.path.join(user.remote_cwd, directory)
+    return data, ''
 
 def exit_handler(command):
     exit(0)
@@ -259,7 +272,7 @@ commands = [
     Command('QUIT', 'quit the current session. \r\n usage: QUIT ', quit_handler),
     Command('SYST', 'get the system information about the server \r\n usage: SYST ', default_handler),
     Command('MKD', 'make directory. \r\n usage: MKD  <SP> <pathname>', default_handler),
-    Command('CWD', 'change working directory. \r\n usage: CWD  <SP> <pathname>', default_handler),
+    Command('CWD', 'change working directory. \r\n usage: CWD  <SP> <pathname>', cwd_handler),
     Command('PWD', 'print current working directory. \r\n usage: PWD', default_handler),
     Command('LIST', 'list path. \r\n  usage: LIST [<SP> <pathname>]', list_handler),
     Command('RMD', 'remove directory. \r\n  usage: RMD  <SP> <pathname>', default_handler),
