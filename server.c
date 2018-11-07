@@ -1,6 +1,14 @@
 
 #include "common.h"
 
+int listenfd;
+
+void handler(int x)
+{
+	close(listenfd);
+	exit(0);
+}
+
 int main(int argc, char **argv)
 {
 	// check arguments and set port and root_dir
@@ -31,7 +39,7 @@ int main(int argc, char **argv)
 		}
 	}
 
-	int listenfd, connfd;
+	int connfd;
 	struct sockaddr_in addr;
 
 	if ((listenfd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
@@ -57,6 +65,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	signal(SIGINT, handler);
 	while (1)
 	{
 		if ((connfd = accept(listenfd, NULL, NULL)) == -1)
