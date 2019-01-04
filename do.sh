@@ -1,0 +1,1 @@
+scp * gpu103:/home/youkaichao/code/server/; ssh youkaichao@gpu103 'bash -s' < command.sh
